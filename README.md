@@ -1,6 +1,3 @@
-<img width="6000" height="3775" alt="screenshot_einstein_myth" src="https://github.com/user-attachments/assets/f57e7744-6dda-4e1e-aa8d-76fe6b92f880" />
-<img width="6000" height="3108" alt="screenshot_math_certain" src="https://github.com/user-attachments/assets/e5f3018b-2754-44dc-96bc-6102a7d217ab" />
-<img width="6000" height="3712" alt="screenshot_bat_ball_logic" src="https://github.com/user-attachments/assets/7976774e-8cb7-4f8a-ab68-857eec24c347" />
 # CoT Uncertainty Visualiser
 ### Step-level hallucination detection via multi-trace consistency
 
@@ -88,3 +85,42 @@ The key contribution vs existing tools:
 
 This directly addresses the research direction described in Project 3 of
 Yunrui Zhang's Winter Research Projects 2026 at Monash University.
+
+## Example Outputs
+
+### Test 1 — Catching a hallucination mid-chain
+**Question:** *"Did Einstein fail mathematics at school?"*
+
+<img width="800" alt="screenshot_einstein_myth" src="https://github.com/user-attachments/assets/f57e7744-6dda-4e1e-aa8d-76fe6b92f880" />
+
+The tool samples 3 independent reasoning traces and compares them step by step.
+Step 2 is flagged at **91% uncertainty** — this is exactly where the myth lives.
+The AI contradicts itself across traces on whether Einstein "failed" or "excelled".
+Notably, all 3 traces still converge on the correct final answer, but the tool
+exposes that the reasoning path was unreliable.
+
+---
+
+### Test 2 — High confidence on a factual maths question
+**Question:** *"What is 15% of 200?"*
+
+<img width="800" alt="screenshot_math_certain" src="https://github.com/user-attachments/assets/e5f3018b-2754-44dc-96bc-6102a7d217ab" />
+
+All 4 reasoning steps score below 10% uncertainty. Every trace follows the
+exact same algebraic steps and arrives at the same answer (30). This shows
+the tool is not just randomly flagging things red — it correctly recognises
+when the model is genuinely certain.
+
+---
+
+### Test 3 — Pinpointing the exact step where the logic breaks
+**Question:** *"A bat and ball cost $1.10. The bat costs $1 more than the ball. How much does the ball cost?"*
+
+<img width="800" alt="screenshot_bat_ball_logic" src="https://github.com/user-attachments/assets/7976774e-8cb7-4f8a-ab68-857eec24c347" />
+
+This is a classic cognitive bias trap — the intuitive answer ($0.10) is wrong,
+the correct answer is $0.05. 2 out of 3 traces give the wrong answer.
+The tool flags Steps 2 and 3 at **88% and 82% uncertainty** — precisely the
+steps where traces diverge between the intuitive shortcut and the correct algebra.
+The final answer step is also flagged uncertain (68%) because the traces genuinely
+disagree on the answer itself.
