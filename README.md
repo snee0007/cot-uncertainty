@@ -1,3 +1,6 @@
+<img width="6000" height="3775" alt="screenshot_einstein_myth" src="https://github.com/user-attachments/assets/f57e7744-6dda-4e1e-aa8d-76fe6b92f880" />
+<img width="6000" height="3108" alt="screenshot_math_certain" src="https://github.com/user-attachments/assets/e5f3018b-2754-44dc-96bc-6102a7d217ab" />
+<img width="6000" height="3712" alt="screenshot_bat_ball_logic" src="https://github.com/user-attachments/assets/7976774e-8cb7-4f8a-ab68-857eec24c347" />
 # CoT Uncertainty Visualiser
 ### Step-level hallucination detection via multi-trace consistency
 
