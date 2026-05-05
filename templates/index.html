@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CoT Uncertainty Visualiser</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0e0e10;
+    --bg2:     #17171a;
+    --bg3:     #1f1f23;
+    --bd:      rgba(255,255,255,0.07);
+    --bd2:     rgba(255,255,255,0.14);
+    --t1:      #f0eff4;
+    --t2:      #a09fb0;
+    --t3:      #5e5d6e;
+    --accent:  #7c6ff7;
+    --accent2: #2dd4ab;
+    --c-sure:  #22c55e;
+    --c-good:  #84cc16;
+    --c-warn:  #f59e0b;
+    --c-bad:   #f43f5e;
+    --radius:  10px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--t1);
+    min-height: 100vh;
+    padding: 3rem 1rem 6rem;
+  }
+
+  .wrap { max-width: 820px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(124,111,247,0.15); color: var(--accent);
+    font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+    padding: 4px 12px; border-radius: 99px;
+    border: 1px solid rgba(124,111,247,0.25);
+    margin-bottom: 1.25rem;
+  }
+  h1 {
+    font-size: clamp(26px, 5vw, 38px); font-weight: 600;
+    letter-spacing: -0.03em; line-height: 1.15;
+    margin-bottom: 6px;
+  }
+  h1 span { color: var(--accent); }
+  .sub {
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    color: var(--t3); margin-bottom: 2.5rem;
+  }
+
+  /* ── How it works ── */
+  .how-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 2.5rem;
+  }
+  .how-card {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
+  .how-num {
+    font-family: 'IBM Plex Mono', monospace; font-size: 20px;
+    font-weight: 500; color: var(--accent); line-height: 1;
+  }
+  .how-title { font-size: 13px; font-weight: 500; margin: 6px 0 3px; }
+  .how-body  { font-size: 12px; color: var(--t3); line-height: 1.55; }
+
+  /* ── Input ── */
+  .input-wrap {
+    display: flex; gap: 8px; margin-bottom: 10px;
+  }
+  .q-input {
+    flex: 1; height: 48px; padding: 0 16px;
+    background: var(--bg2); color: var(--t1);
+    border: 1px solid var(--bd2); border-radius: var(--radius);
+    font-size: 14px; font-family: 'DM Sans', sans-serif;
+    outline: none; transition: border 0.15s;
+  }
+  .q-input:focus { border-color: var(--accent); }
+  .q-input::placeholder { color: var(--t3); }
+
+  .run-btn {
+    height: 48px; padding: 0 22px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius);
+    font-size: 13px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .run-btn:hover  { opacity: 0.88; }
+  .run-btn:active { transform: scale(0.97); }
+  .run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .samples { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2rem; }
+  .sample-btn {
+    font-size: 11.5px; padding: 5px 12px;
+    border: 1px solid var(--bd); border-radius: 99px;
+    background: transparent; color: var(--t2);
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: background 0.12s, border 0.12s;
+  }
+  .sample-btn:hover { background: var(--bg3); border-color: var(--bd2); }
+
+  /* ── Status ── */
+  .status-bar {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1.5rem; font-size: 13px; color: var(--t2);
+  }
+  .spinner {
+    width: 15px; height: 15px; flex-shrink: 0;
+    border: 2px solid var(--bd2); border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .prog-track {
+    flex: 1; height: 3px; background: var(--bg3);
+    border-radius: 99px; overflow: hidden;
+  }
+  .prog-fill {
+    height: 100%; background: var(--accent); border-radius: 99px;
+    transition: width 0.4s ease;
+  }
+  .prog-pct {
+    font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+    color: var(--t3); min-width: 32px; text-align: right;
+  }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 10px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--t3);
+    font-family: 'IBM Plex Mono', monospace; margin-bottom: 10px;
+  }
+
+  /* ── Summary stats ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
+  .stat-val {
+    font-size: 26px; font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace; line-height: 1;
+  }
+  .stat-lbl { font-size: 11px; color: var(--t3); margin-top: 4px; }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t2); }
+  .legend-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Step cards ── */
+  .steps-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 2rem; }
+
+  .step-card {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-left-width: 2px; border-radius: var(--radius);
+    padding: 14px 16px;
+    display: grid; grid-template-columns: 1fr 100px;
+    gap: 12px; align-items: start;
+    transition: border-color 0.2s;
+    animation: fadeUp 0.3s ease both;
+  }
+  .step-card:hover { border-color: var(--bd2); }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-num  { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--t3); margin-bottom: 5px; }
+  .step-text { font-size: 13.5px; line-height: 1.65; color: var(--t1); }
+  .step-note { font-size: 11px; color: var(--t3); font-style: italic; margin-top: 5px; }
+
+  .unc-block { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  .unc-label { font-size: 10px; font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
+  .unc-bar-track {
+    width: 88px; height: 4px; background: var(--bg3);
+    border-radius: 99px; overflow: hidden;
+  }
+  .unc-bar-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
+  .unc-pct { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--t3); }
+
+  /* ── Raw traces ── */
+  .traces-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 2rem;
+  }
+  .trace-card {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-radius: var(--radius); padding: 12px;
+    max-height: 200px; overflow-y: auto;
+  }
+  .trace-title { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--t3); margin-bottom: 8px; }
+  .trace-text  {
+    font-size: 11px; color: var(--t2); line-height: 1.6;
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* ── Error ── */
+  .error-box {
+    background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.3);
+    border-radius: var(--radius); padding: 12px 16px;
+    font-size: 13px; color: #fca5a5; margin-bottom: 1rem;
+  }
+
+  /* ── Question badge ── */
+  .q-badge {
+    background: var(--bg2); border: 1px solid var(--bd);
+    border-radius: var(--radius); padding: 14px 16px;
+    margin-bottom: 1.5rem;
+  }
+  .q-badge-label { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--t3); margin-bottom: 4px; }
+  .q-badge-text  { font-size: 14px; font-weight: 500; }
+
+  /* ── Divider ── */
+  hr { border: none; border-top: 1px solid var(--bd); margin: 1.5rem 0; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 99px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="chip">⬡ Research Prototype · Monash University</div>
+  <h1>CoT <span>Uncertainty</span> Visualiser</h1>
+  <p class="sub">// step-level hallucination detection via multi-trace consistency analysis</p>
+
+  <div class="how-grid">
+    <div class="how-card">
+      <div class="how-num">01</div>
+      <div class="how-title">Sample 3 traces</div>
+      <div class="how-body">Sends your question to the LLM 3 times independently to get different chain-of-thought responses.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-num">02</div>
+      <div class="how-title">Cross-trace analysis</div>
+      <div class="how-body">Compares reasoning steps across all 3 traces. Steps that differ or contradict each other signal higher uncertainty.</div>
+    </div>
+    <div class="how-card">
+      <div class="how-num">03</div>
+      <div class="how-title">Score &amp; visualise</div>
+      <div class="how-body">Each reasoning step gets an uncertainty score 0–1 with an explanation, colour-coded for fast scanning.</div>
+    </div>
+  </div>
+
+  <div class="input-wrap">
+    <input class="q-input" id="qinput" type="text" placeholder="Ask a factual or reasoning question…" />
+    <button class="run-btn" id="runbtn" onclick="runAnalysis()">Analyse ↗</button>
+  </div>
+  <div class="samples" id="samples">
+    <span style="font-size:11px;color:var(--t3);align-self:center;">Try:</span>
+  </div>
+
+  <div id="status-area"></div>
+  <div id="results-area"></div>
+
+</div>
+
+<script>
+  const SAMPLES = [
+    "Is the Great Wall of China visible from space?",
+    "Did Einstein fail mathematics at school?",
+    "If all birds can fly and penguins are birds, can penguins fly?",
+    "What year did the Berlin Wall fall and why?",
+    "Is drinking 8 glasses of water a day scientifically proven?"
+  ];
+
+  // Inject sample buttons
+  const samplesEl = document.getElementById("samples");
+  SAMPLES.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "sample-btn";
+    b.textContent = s;
+    b.onclick = () => { document.getElementById("qinput").value = s; };
+    samplesEl.appendChild(b);
+  });
+
+  document.getElementById("qinput").addEventListener("keydown", e => {
+    if (e.key === "Enter") runAnalysis();
+  });
+
+  // Colour helpers
+  function ucColor(u) {
+    if (u < 0.25) return "var(--c-sure)";
+    if (u < 0.50) return "var(--c-good)";
+    if (u < 0.75) return "var(--c-warn)";
+    return "var(--c-bad)";
+  }
+  function ucLabel(u) {
+    if (u < 0.25) return "Certain";
+    if (u < 0.50) return "Mostly certain";
+    if (u < 0.75) return "Uncertain";
+    return "High uncertainty";
+  }
+
+  let running = false;
+
+  async function runAnalysis() {
+    if (running) return;
+    const q = document.getElementById("qinput").value.trim();
+    if (!q) return;
+
+    running = true;
+    document.getElementById("runbtn").disabled = true;
+    document.getElementById("results-area").innerHTML = "";
+
+    const statusEl = document.getElementById("status-area");
+
+    function setStatus(msg, pct) {
+      statusEl.innerHTML = `
+        <div class="status-bar">
+          <div class="spinner"></div>
+          <span>${msg}</span>
+          <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+          <span class="prog-pct">${pct}%</span>
+        </div>`;
+    }
+
+    setStatus("Generating 3 independent reasoning traces…", 15);
+
+    try {
+      const res  = await fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q })
+      });
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      setStatus("Rendering results…", 100);
+      setTimeout(() => {
+        statusEl.innerHTML = "";
+        renderResults(q, data.traces, data.steps);
+      }, 300);
+
+    } catch (err) {
+      statusEl.innerHTML = `<div class="error-box">Error: ${err.message}</div>`;
+    } finally {
+      running = false;
+      document.getElementById("runbtn").disabled = false;
+    }
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function renderResults(q, traces, steps) {
+    const avgUnc  = steps.length ? steps.reduce((a, s) => a + s.uncertainty, 0) / steps.length : 0;
+    const flagged = steps.filter(s => s.uncertainty >= 0.5).length;
+
+    let html = `
+      <div class="q-badge">
+        <div class="q-badge-label">question</div>
+        <div class="q-badge-text">${esc(q)}</div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-val">${steps.length}</div>
+          <div class="stat-lbl">reasoning steps analysed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="color:${ucColor(avgUnc)}">${Math.round(avgUnc * 100)}%</div>
+          <div class="stat-lbl">average uncertainty score</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="color:var(--c-bad)">${flagged}</div>
+          <div class="stat-lbl">steps flagged uncertain</div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-sure)"></div>Certain (0–25%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-good)"></div>Mostly certain (25–50%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-warn)"></div>Uncertain (50–75%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-bad)"></div>High uncertainty (75–100%)</div>
+      </div>
+
+      <p class="section-label">Step-level uncertainty breakdown</p>
+      <div class="steps-list">`;
+
+    steps.forEach((s, i) => {
+      const c   = ucColor(s.uncertainty);
+      const lbl = ucLabel(s.uncertainty);
+      const pct = Math.round(s.uncertainty * 100);
+      html += `
+        <div class="step-card" style="border-left-color:${c}; animation-delay:${i * 0.05}s">
+          <div>
+            <div class="step-num">STEP ${i + 1}</div>
+            <div class="step-text">${esc(s.text)}</div>
+            ${s.note ? `<div class="step-note">${esc(s.note)}</div>` : ""}
+          </div>
+          <div class="unc-block">
+            <div class="unc-label" style="color:${c}">${lbl}</div>
+            <div class="unc-bar-track">
+              <div class="unc-bar-fill" style="width:${pct}%; background:${c}"></div>
+            </div>
+            <div class="unc-pct">${pct}%</div>
+          </div>
+        </div>`;
+    });
+
+    html += `</div>
+      <hr/>
+      <p class="section-label">Raw traces — 3 independent samples</p>
+      <div class="traces-grid">`;
+
+    traces.forEach((t, i) => {
+      html += `
+        <div class="trace-card">
+          <div class="trace-title">TRACE ${i + 1}</div>
+          <div class="trace-text">${esc(t)}</div>
+        </div>`;
+    });
+
+    html += `</div>`;
+    document.getElementById("results-area").innerHTML = html;
+    window.scrollTo({ top: 400, behavior: "smooth" });
+  }
+</script>
+</body>
+</html>
